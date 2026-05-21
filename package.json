@@ -1,0 +1,17 @@
+{
+  "name": "popup-template-builder",
+  "version": "1.0.0",
+  "description": "Interactive popup template builder",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ..",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "cd frontend && npm run dev",
+    "server": "cd backend && npm run dev",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build && cd ..",
+    "test": "cd backend && npm test && cd ../frontend && npm test && cd .."
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

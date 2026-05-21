@@ -1,0 +1,77 @@
+[
+  {
+    "id": "template_1779400653727_chkupwz5q",
+    "name": "test",
+    "elements": [
+      {
+        "id": "el-1779400618087-223l7c1c9",
+        "position": {
+          "x": 44,
+          "y": 23.59375762939453
+        },
+        "size": {
+          "width": 220,
+          "height": 69
+        },
+        "type": "heading",
+        "content": "ughvb",
+        "fontSize": 25,
+        "color": "#3c4a90",
+        "alignment": "center"
+      },
+      {
+        "id": "el-1779400621310-0vmzr0anp",
+        "position": {
+          "x": 43,
+          "y": 103.5999984741211
+        },
+        "size": {
+          "width": 200,
+          "height": 50
+        },
+        "type": "text",
+        "content": "New Text",
+        "fontSize": 16,
+        "color": "#000000",
+        "alignment": "left"
+      },
+      {
+        "id": "el-1779400624296-6bc33mrsu",
+        "position": {
+          "x": 35,
+          "y": 168.5999984741211
+        },
+        "size": {
+          "width": 161,
+          "height": 60
+        },
+        "type": "button",
+        "text": "Click Me",
+        "backgroundColor": "#007acc",
+        "textColor": "#ffffff",
+        "borderRadius": 8
+      },
+      {
+        "id": "el-1779400629282-pk3lg3hll",
+        "position": {
+          "x": 37,
+          "y": 273.5999984741211
+        },
+        "size": {
+          "width": 200,
+          "height": 150
+        },
+        "type": "image",
+        "url": "https://via.placeholder.com/500x400",
+        "altText": "Placeholder Image"
+      }
+    ],
+    "canvasSize": {
+      "width": 400,
+      "height": 500
+    },
+    "backgroundColor": "#ffffff",
+    "createdAt": "2026-05-21T21:57:33.727Z",
+    "updatedAt": "2026-05-21T22:11:56.065Z"
+  }
+]
