@@ -6,17 +6,17 @@ const router = createRouter({
     {
       path: '/',
       name: 'templates',
-      component: () => import('../views/TemplatesView.vue'),
+      component: () => import('../views/TemplatesView'),
     },
     {
       path: '/builder',
       name: 'builder',
-      component: () => import('../views/BuilderView.vue'),
+      component: () => import('../views/BuilderView'),
     },
     {
       path: '/builder/:id',
       name: 'builder-edit',
-      component: () => import('../views/BuilderView.vue'),
+      component: () => import('../views/BuilderView'),
     },
   ],
 });

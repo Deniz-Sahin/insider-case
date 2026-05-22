@@ -1,4 +1,5 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
+import './ButtonProperties.css';
 import { ref, watch } from 'vue';
 import { useTemplateStore } from '@/stores/templateStore';
 import type { ButtonElement } from '@/types/template.types';
@@ -42,20 +43,7 @@ function updateBorderRadius() {
   templateStore.updateElement(props.element.id, { borderRadius: radius });
 }
 
-// Preset color buttons
-const presetBackgrounds = [
-  { name: 'Blue', color: '#007acc' },
-  { name: 'Green', color: '#28a745' },
-  { name: 'Red', color: '#dc3545' },
-  { name: 'Orange', color: '#fd7e14' },
-  { name: 'Purple', color: '#6f42c1' },
-  { name: 'Dark', color: '#343a40' },
-];
 
-function applyPresetBackground(color: string) {
-  backgroundColor.value = color;
-  updateBackgroundColor();
-}
 </script>
 
 <template>
@@ -96,18 +84,6 @@ function applyPresetBackground(color: string) {
             class="property-input color-text"
             placeholder="#007acc"
           />
-        </div>
-
-        <!-- Preset colors -->
-        <div class="preset-colors">
-          <button
-            v-for="preset in presetBackgrounds"
-            :key="preset.color"
-            :style="{ backgroundColor: preset.color }"
-            :title="preset.name"
-            class="preset-color-btn"
-            @click="applyPresetBackground(preset.color)"
-          ></button>
         </div>
       </div>
 
@@ -157,23 +133,6 @@ function applyPresetBackground(color: string) {
         />
       </div>
 
-      <!-- Preview -->
-      <div class="property-group">
-        <label>Preview</label>
-        <div class="button-preview">
-          <button
-            class="preview-button"
-            :style="{
-              backgroundColor: backgroundColor,
-              color: textColor,
-              borderRadius: `${borderRadius}px`,
-            }"
-          >
-            {{ text || 'Button Preview' }}
-          </button>
-        </div>
-      </div>
-
       <!-- Element Info -->
       <div class="property-group info">
         <label>Position</label>
@@ -188,184 +147,41 @@ function applyPresetBackground(color: string) {
           {{ Math.round(element.size.width) }}×{{ Math.round(element.size.height) }}px
         </span>
       </div>
+
+      <!-- Z-Index Controls -->
+      <div class="property-group">
+        <label>Layer Order</label>
+        <div class="layer-controls">
+          <button
+            class="layer-btn"
+            @click="templateStore.bringForward(element.id)"
+            title="Bring Forward"
+          >
+            ↑ Forward
+          </button>
+          <button
+            class="layer-btn"
+            @click="templateStore.sendBackward(element.id)"
+            title="Send Backward"
+          >
+            ↓ Backward
+          </button>
+        </div>
+        <span class="info-text" style="margin-top: 8px; display: block;">
+          Z-Index: {{ element.zIndex || 0 }}
+        </span>
+      </div>
     </div>
+
+    <!-- Delete Button -->
+    <button 
+      class="btn-delete-element" 
+      @click="templateStore.removeElement(element.id)"
+    >
+      🗑️ Delete Element
+    </button>
   </div>
 </template>
 
-<style scoped>
-.properties-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
 
-.panel-header {
-  margin-bottom: 1.5rem;
-}
 
-.panel-header h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-}
-
-.properties-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.property-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.property-group label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #7f8c8d;
-}
-
-.property-input {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e1e8ed;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  transition: border-color 0.2s;
-}
-
-.property-input:focus {
-  outline: none;
-  border-color: #007acc;
-}
-
-.input-with-unit {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.input-with-unit .property-input {
-  flex: 1;
-}
-
-.unit {
-  font-size: 0.875rem;
-  color: #7f8c8d;
-  font-weight: 500;
-}
-
-.property-slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #e1e8ed;
-  outline: none;
-  -webkit-appearance: none;
-}
-
-.property-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #007acc;
-  cursor: pointer;
-}
-
-.property-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #007acc;
-  cursor: pointer;
-  border: none;
-}
-
-.color-picker-group {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.color-input {
-  width: 48px;
-  height: 40px;
-  border: 1px solid #e1e8ed;
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 2px;
-}
-
-.color-input::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-input::-webkit-color-swatch {
-  border: none;
-  border-radius: 4px;
-}
-
-.color-text {
-  flex: 1;
-}
-
-.preset-colors {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.preset-color-btn {
-  width: 36px;
-  height: 36px;
-  border: 2px solid white;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.preset-color-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-}
-
-.button-preview {
-  padding: 1rem;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.preview-button {
-  padding: 0.5rem 1.5rem;
-  border: none;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: default;
-  font-family: inherit;
-  transition: none;
-}
-
-.property-group.info {
-  padding: 0.75rem;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-}
-
-.property-group.info label {
-  margin-bottom: 0.25rem;
-}
-
-.info-text {
-  font-size: 0.875rem;
-  color: #2c3e50;
-}
-</style>

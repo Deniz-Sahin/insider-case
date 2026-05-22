@@ -1,4 +1,5 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
+import './TextProperties.css';
 import { ref, watch } from 'vue';
 import { useTemplateStore } from '@/stores/templateStore';
 import type { TextElement } from '@/types/template.types';
@@ -158,180 +159,41 @@ function updateAlignment(align: 'left' | 'center' | 'right') {
           {{ Math.round(element.size.width) }}×{{ Math.round(element.size.height) }}px
         </span>
       </div>
+
+      <!-- Z-Index Controls -->
+      <div class="property-group">
+        <label>Layer Order</label>
+        <div class="layer-controls">
+          <button
+            class="layer-btn"
+            @click="templateStore.bringForward(element.id)"
+            title="Bring Forward"
+          >
+            ↑ Forward
+          </button>
+          <button
+            class="layer-btn"
+            @click="templateStore.sendBackward(element.id)"
+            title="Send Backward"
+          >
+            ↓ Backward
+          </button>
+        </div>
+        <span class="info-text" style="margin-top: 8px; display: block;">
+          Z-Index: {{ element.zIndex || 0 }}
+        </span>
+      </div>
     </div>
+
+    <!-- Delete Button -->
+    <button 
+      class="btn-delete-element" 
+      @click="templateStore.removeElement(element.id)"
+    >
+      🗑️ Delete Element
+    </button>
   </div>
 </template>
 
-<style scoped>
-.properties-panel {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
 
-.panel-header {
-  margin-bottom: 1.5rem;
-}
 
-.panel-header h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin: 0;
-}
-
-.properties-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.property-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.property-group label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #7f8c8d;
-}
-
-.property-input {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e1e8ed;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-family: inherit;
-  transition: border-color 0.2s;
-}
-
-.property-input:focus {
-  outline: none;
-  border-color: #007acc;
-}
-
-.textarea {
-  resize: vertical;
-  min-height: 80px;
-  font-family: inherit;
-}
-
-.input-with-unit {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.input-with-unit .property-input {
-  flex: 1;
-}
-
-.unit {
-  font-size: 0.875rem;
-  color: #7f8c8d;
-  font-weight: 500;
-}
-
-.property-slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: #e1e8ed;
-  outline: none;
-  -webkit-appearance: none;
-}
-
-.property-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #007acc;
-  cursor: pointer;
-}
-
-.property-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #007acc;
-  cursor: pointer;
-  border: none;
-}
-
-.color-picker-group {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.color-input {
-  width: 48px;
-  height: 40px;
-  border: 1px solid #e1e8ed;
-  border-radius: 6px;
-  cursor: pointer;
-  padding: 2px;
-}
-
-.color-input::-webkit-color-swatch-wrapper {
-  padding: 0;
-}
-
-.color-input::-webkit-color-swatch {
-  border: none;
-  border-radius: 4px;
-}
-
-.color-text {
-  flex: 1;
-}
-
-.alignment-buttons {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.alignment-btn {
-  flex: 1;
-  padding: 0.5rem;
-  background-color: white;
-  border: 1px solid #e1e8ed;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #7f8c8d;
-  transition: all 0.2s;
-}
-
-.alignment-btn:hover {
-  border-color: #007acc;
-  color: #007acc;
-}
-
-.alignment-btn.active {
-  background-color: #007acc;
-  border-color: #007acc;
-  color: white;
-}
-
-.property-group.info {
-  padding: 0.75rem;
-  background-color: #f8f9fa;
-  border-radius: 6px;
-}
-
-.property-group.info label {
-  margin-bottom: 0.25rem;
-}
-
-.info-text {
-  font-size: 0.875rem;
-  color: #2c3e50;
-}
-</style>

@@ -1,0 +1,160 @@
+﻿.templates-view {
+  min-height: 100vh;
+  padding: 2rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.header h1 {
+  font-size: 2rem;
+  color: #2c3e50;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background-color: #007acc;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #005a9e;
+}
+
+.loading,
+.error {
+  text-align: center;
+  padding: 3rem;
+  font-size: 1.1rem;
+}
+
+.error {
+  color: #e74c3c;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.empty-state h2 {
+  font-size: 1.5rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.empty-state p {
+  color: #7f8c8d;
+  margin-bottom: 2rem;
+}
+
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 400px));
+  gap: 2rem;
+  width: 100%;
+  max-width: 100%;
+  justify-content: start;
+}
+
+@media (min-width: 768px) {
+  .templates-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 380px));
+  }
+}
+
+.template-card {
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  transition: transform 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+}
+
+.template-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.template-info {
+  padding: 1.5rem;
+  flex: 1;
+}
+
+.template-info h3 {
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin-bottom: 0.5rem;
+}
+
+.template-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #95a5a6;
+  flex-wrap: wrap;
+}
+
+.meta-separator {
+  color: #cbd5e0;
+}
+
+.meta-elements {
+  color: #007acc;
+  font-weight: 600;
+}
+
+.template-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  border-top: 1px solid #e1e8ed;
+}
+
+.btn-edit,
+.btn-delete {
+  flex: 1;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-edit {
+  background-color: #f0f0f0;
+  color: #2c3e50;
+}
+
+.btn-edit:hover {
+  background-color: #e0e0e0;
+}
+
+.btn-delete {
+  background-color: #fee;
+  color: #e74c3c;
+}
+
+.btn-delete:hover {
+  background-color: #fdd;
+}

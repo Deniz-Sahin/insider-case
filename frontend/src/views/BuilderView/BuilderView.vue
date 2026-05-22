@@ -1,13 +1,16 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
+import './BuilderView.css';
 import { ref, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useTemplateStore } from '@/stores/templateStore';
-import ElementsSidebar from '@/components/ElementsSidebar.vue';
-import TemplateCanvas from '@/components/TemplateCanvas.vue';
-import HeadingProperties from '@/components/HeadingProperties.vue';
-import TextProperties from '@/components/TextProperties.vue';
-import ButtonProperties from '@/components/ButtonProperties.vue';
-import ImageProperties from '@/components/ImageProperties.vue';
+import { v4 as uuidv4 } from 'uuid';
+import ElementsSidebar from '@/components/ElementsSidebar';
+import TemplateCanvas from '@/components/TemplateCanvas';
+import HeadingProperties from '@/components/HeadingProperties';
+import TextProperties from '@/components/TextProperties';
+import ButtonProperties from '@/components/ButtonProperties';
+import ImageProperties from '@/components/ImageProperties';
+import DividerProperties from '@/components/DividerProperties';
 
 const router = useRouter();
 const route = useRoute();
@@ -82,6 +85,89 @@ const saveTemplate = async () => {
     alert('Failed to save template. Please try again.');
   }
 };
+
+const exportTemplate = () => {
+  if (!templateStore.currentTemplate) return;
+
+  // Remove id from each element
+  const elementsWithoutIds = templateStore.currentTemplate.elements.map(element => {
+    const { id, ...elementWithoutId } = element;
+    return elementWithoutId;
+  });
+
+  const templateData = {
+    name: templateName.value,
+    elements: elementsWithoutIds,
+    canvasSize: templateStore.currentTemplate.canvasSize,
+    backgroundColor: templateStore.currentTemplate.backgroundColor,
+    exportedAt: new Date().toISOString(),
+  };
+
+  const dataStr = JSON.stringify(templateData, null, 2);
+  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const url = URL.createObjectURL(dataBlob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${templateName.value.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_template.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+const fileInput = ref<HTMLInputElement | null>(null);
+
+const triggerImport = () => {
+  fileInput.value?.click();
+};
+
+const importTemplate = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const result = e.target?.result as string;
+      const importedData = JSON.parse(result);
+
+      // Validate imported data
+      if (!importedData.elements || !Array.isArray(importedData.elements)) {
+        alert('Invalid template file: missing or invalid elements array');
+        return;
+      }
+
+      // Generate new IDs for all imported elements
+      const elementsWithNewIds = importedData.elements.map((element: any) => ({
+        ...element,
+        id: uuidv4(),
+      }));
+
+      // Set the imported template as current template
+      templateStore.setCurrentTemplate({
+        id: '',
+        name: importedData.name || 'Imported Template',
+        elements: elementsWithNewIds,
+        canvasSize: importedData.canvasSize || { width: 400, height: 500 },
+        backgroundColor: importedData.backgroundColor || '#ffffff',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+
+      templateName.value = importedData.name || 'Imported Template';
+      hasUnsavedChanges.value = true;
+      alert('Template imported successfully! Click "Save Template" to save it.');
+    } catch (error) {
+      alert('Failed to import template. Please make sure the file is a valid JSON template.');
+    }
+  };
+
+  reader.readAsText(file);
+  // Reset input so the same file can be imported again if needed
+  target.value = '';
+};
 </script>
 
 <template>
@@ -96,7 +182,20 @@ const saveTemplate = async () => {
       />
       <div class="header-actions">
         <span v-if="hasUnsavedChanges" class="unsaved-indicator">● Unsaved changes</span>
+        <button class="btn-import" @click="triggerImport" title="Import Template">
+          📥 Import
+        </button>
+        <button class="btn-export" @click="exportTemplate" title="Export Template">
+          📤 Export
+        </button>
         <button class="btn-save" @click="saveTemplate">Save Template</button>
+        <input 
+          ref="fileInput"
+          type="file" 
+          accept="application/json,.json"
+          style="display: none"
+          @change="importTemplate"
+        />
       </div>
     </header>
 
@@ -134,6 +233,12 @@ const saveTemplate = async () => {
           :element="templateStore.selectedElement"
         />
 
+        <!-- Divider Properties -->
+        <DividerProperties 
+          v-else-if="templateStore.selectedElement?.type === 'divider'"
+          :element="templateStore.selectedElement"
+        />
+
         <!-- Empty State -->
         <div v-else class="properties-empty">
           <div class="empty-icon">
@@ -146,165 +251,10 @@ const saveTemplate = async () => {
           <h4>No Element Selected</h4>
           <p>Click an element on the canvas to edit its properties</p>
         </div>
-
-        <!-- Delete Button (shown for any selected element) -->
-        <button 
-          v-if="templateStore.selectedElement"
-          class="btn-delete-element" 
-          @click="templateStore.removeElement(templateStore.selectedElement.id)"
-        >
-          🗑️ Delete Element
-        </button>
       </div>
     </div>
   </div>
 </template>
 
-<style scoped>
-.builder-view {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  width: 100vw;
-  position: fixed;
-  top: 0;
-  left: 0;
-  overflow: hidden;
-}
 
-.builder-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 1rem 2rem;
-  background-color: #f8f9fa;
-  border-bottom: 1px solid #e1e8ed;
-}
 
-.btn-back {
-  padding: 0.5rem 1rem;
-  background-color: white;
-  border: 1px solid #e1e8ed;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.2s;
-}
-
-.btn-back:hover {
-  background-color: #f0f0f0;
-}
-
-.template-name-input {
-  flex: 1;
-  padding: 0.5rem 1rem;
-  border: 1px solid #e1e8ed;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.unsaved-indicator {
-  font-size: 0.875rem;
-  color: #e74c3c;
-  font-weight: 500;
-}
-
-.btn-save {
-  padding: 0.5rem 1.5rem;
-  background-color: #007acc;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.btn-save:hover {
-  background-color: #005a9e;
-}
-
-.builder-content {
-  display: grid;
-  grid-template-columns: 250px 1fr 300px;
-  flex: 1;
-  overflow: hidden;
-}
-
-.sidebar,
-.properties {
-  padding: 1.5rem;
-  background-color: #f8f9fa;
-  border-right: 1px solid #e1e8ed;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.properties {
-  border-right: none;
-  border-left: 1px solid #e1e8ed;
-}
-
-.properties-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  padding: 3rem 1rem;
-  text-align: center;
-  flex: 1;
-}
-
-.empty-icon {
-  color: #cbd5e0;
-}
-
-.properties-empty h4 {
-  font-size: 1rem;
-  color: #2c3e50;
-  margin: 0;
-}
-
-.properties-empty p {
-  font-size: 0.875rem;
-  color: #95a5a6;
-  margin: 0;
-}
-
-.btn-delete-element {
-  margin-top: auto;
-  padding: 0.75rem 1rem;
-  background-color: #fee;
-  color: #e74c3c;
-  border: 1px solid #e74c3c;
-  border-radius: 6px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-delete-element:hover {
-  background-color: #fdd;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(231, 76, 60, 0.2);
-}
-
-.canvas-container {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: #e9ecef;
-  overflow: auto;
-}
-</style>

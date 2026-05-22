@@ -1,13 +1,16 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
+import './TemplateCanvas.css';
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useTemplateStore } from '@/stores/templateStore';
+import { v4 as uuidv4 } from 'uuid';
 import type { 
   TemplateElement, 
   ElementType, 
   HeadingElement, 
   TextElement, 
   ButtonElement, 
-  ImageElement 
+  ImageElement,
+  DividerElement
 } from '@/types/template.types';
 
 const templateStore = useTemplateStore();
@@ -23,6 +26,8 @@ const draggingElement = ref<TemplateElement | null>(null);
 const dragOffset = ref({ x: 0, y: 0 });
 const resizeHandle = ref<string | null>(null);
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 });
+const initialDragPosition = ref<{ x: number; y: number } | null>(null);
+const initialResizeSize = ref<{ width: number; height: number } | null>(null);
 
 // Computed
 const canvasStyle = computed(() => ({
@@ -36,7 +41,7 @@ const selectedElementId = computed(() => templateStore.selectedElement?.id || nu
 
 // Generate unique ID
 function generateId(): string {
-  return `el-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  return uuidv4();
 }
 
 // Create default element based on type
@@ -88,6 +93,16 @@ function createDefaultElement(type: ElementType, x: number, y: number): Template
         altText: 'Placeholder Image',
       } as ImageElement;
 
+    case 'divider':
+      return {
+        ...baseElement,
+        type: 'divider',
+        size: { width: 300, height: 2 },
+        color: '#e1e8ed',
+        thickness: 2,
+        style: 'solid',
+      } as DividerElement;
+
     default:
       throw new Error(`Unknown element type: ${type}`);
   }
@@ -134,12 +149,16 @@ function deselectElement() {
 
 // Element dragging within canvas
 function startDragElement(element: TemplateElement, event: MouseEvent) {
+  event.preventDefault();
   event.stopPropagation();
 
   if (resizeHandle.value) return; // Don't start drag if resizing
 
   draggingElement.value = element;
   templateStore.selectElement(element);
+
+  // Store initial position for comparison later
+  initialDragPosition.value = { ...element.position };
 
   const rect = (event.target as HTMLElement).getBoundingClientRect();
   dragOffset.value = {
@@ -162,24 +181,47 @@ function onDragMove(event: MouseEvent) {
   x = Math.max(0, Math.min(x, CANVAS_WIDTH - draggingElement.value.size.width));
   y = Math.max(0, Math.min(y, CANVAS_HEIGHT - draggingElement.value.size.height));
 
+  // Update position without saving to history during drag
   templateStore.updateElement(draggingElement.value.id, {
     position: { x, y },
-  });
+  }, true);
 }
 
-function stopDragElement() {
-  draggingElement.value = null;
+function stopDragElement(event?: MouseEvent) {
+  const element = draggingElement.value;
+  const initialPos = initialDragPosition.value;
+
+  // Remove listeners first to prevent multiple calls
   document.removeEventListener('mousemove', onDragMove);
   document.removeEventListener('mouseup', stopDragElement);
+
+  draggingElement.value = null;
+  initialDragPosition.value = null;
+
+  // Only save to history if position actually changed
+  if (element && initialPos && templateStore.currentTemplate) {
+    const currentElement = templateStore.currentTemplate.elements.find(el => el.id === element.id);
+    if (currentElement && 
+        (currentElement.position.x !== initialPos.x || currentElement.position.y !== initialPos.y)) {
+      console.log('Drag complete - saving history. From:', initialPos, 'To:', currentElement.position);
+      templateStore.saveCurrentStateToHistory();
+    } else {
+      console.log('Drag complete - NO CHANGE, skipping history');
+    }
+  }
 }
 
 // Element resizing
 function startResize(element: TemplateElement, handle: string, event: MouseEvent) {
+  event.preventDefault();
   event.stopPropagation();
 
   resizeHandle.value = handle;
   draggingElement.value = element;
   templateStore.selectElement(element);
+
+  // Store initial size for comparison later
+  initialResizeSize.value = { ...element.size };
 
   resizeStart.value = {
     x: event.clientX,
@@ -220,16 +262,30 @@ function onResizeMove(event: MouseEvent) {
   newWidth = Math.min(newWidth, maxWidth);
   newHeight = Math.min(newHeight, maxHeight);
 
+  // Update size without saving to history during resize
   templateStore.updateElement(draggingElement.value.id, {
     size: { width: newWidth, height: newHeight },
-  });
+  }, true);
 }
 
 function stopResize() {
+  const element = draggingElement.value;
+  const initialSize = initialResizeSize.value;
+
   resizeHandle.value = null;
   draggingElement.value = null;
+  initialResizeSize.value = null;
   document.removeEventListener('mousemove', onResizeMove);
   document.removeEventListener('mouseup', stopResize);
+
+  // Only save to history if size actually changed
+  if (element && initialSize && templateStore.currentTemplate) {
+    const currentElement = templateStore.currentTemplate.elements.find(el => el.id === element.id);
+    if (currentElement && 
+        (currentElement.size.width !== initialSize.width || currentElement.size.height !== initialSize.height)) {
+      templateStore.saveCurrentStateToHistory();
+    }
+  }
 }
 
 // Delete element
@@ -241,13 +297,51 @@ function deleteElement(event: KeyboardEvent) {
   }
 }
 
+// Undo/Redo keyboard shortcuts
+function handleKeyboardShortcuts(event: KeyboardEvent) {
+  // Check for Ctrl+Z (Undo)
+  if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+    event.preventDefault();
+    templateStore.undo();
+  }
+  // Check for Ctrl+Y (Redo) or Ctrl+Shift+Z (Redo)
+  else if (
+    ((event.ctrlKey || event.metaKey) && event.key === 'y') ||
+    ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'z')
+  ) {
+    event.preventDefault();
+    templateStore.redo();
+  }
+  // Check for Ctrl+C (Copy)
+  else if ((event.ctrlKey || event.metaKey) && event.key === 'c') {
+    if (templateStore.selectedElement) {
+      event.preventDefault();
+      templateStore.copyElement();
+    }
+  }
+  // Check for Ctrl+V (Paste)
+  else if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
+    if (templateStore.copiedElement) {
+      event.preventDefault();
+      templateStore.pasteElement();
+    }
+  }
+  // Delete/Backspace
+  else if (event.key === 'Delete' || event.key === 'Backspace') {
+    if (templateStore.selectedElement) {
+      event.preventDefault();
+      templateStore.removeElement(templateStore.selectedElement.id);
+    }
+  }
+}
+
 // Lifecycle
 onMounted(() => {
-  document.addEventListener('keydown', deleteElement);
+  document.addEventListener('keydown', handleKeyboardShortcuts);
 });
 
 onUnmounted(() => {
-  document.removeEventListener('keydown', deleteElement);
+  document.removeEventListener('keydown', handleKeyboardShortcuts);
   document.removeEventListener('mousemove', onDragMove);
   document.removeEventListener('mouseup', stopDragElement);
   document.removeEventListener('mousemove', onResizeMove);
@@ -262,6 +356,7 @@ function getElementStyle(element: TemplateElement) {
     top: `${element.position.y}px`,
     width: `${element.size.width}px`,
     height: `${element.size.height}px`,
+    zIndex: element.zIndex || 0,
   };
 
   switch (element.type) {
@@ -283,15 +378,17 @@ function getElementStyle(element: TemplateElement) {
       };
 
     case 'button':
-      return {
-        ...baseStyle,
-        backgroundColor: element.backgroundColor,
-        color: element.textColor,
-        borderRadius: `${element.borderRadius}px`,
-      };
+      return baseStyle;
 
     case 'image':
       return baseStyle;
+
+    case 'divider':
+      return {
+        ...baseStyle,
+        borderTop: `${element.thickness}px ${element.style} ${element.color}`,
+        height: `${element.thickness}px`,
+      };
 
     default:
       return baseStyle;
@@ -338,9 +435,13 @@ function getElementStyle(element: TemplateElement) {
         </div>
 
         <!-- Button Element -->
-        <button v-else-if="element.type === 'button'" class="element-content button-element">
+        <div v-else-if="element.type === 'button'" class="element-content button-element" :style="{
+          backgroundColor: element.backgroundColor,
+          color: element.textColor,
+          borderRadius: `${element.borderRadius}px`
+        }">
           {{ element.text }}
-        </button>
+        </div>
 
         <!-- Image Element -->
         <img
@@ -349,6 +450,10 @@ function getElementStyle(element: TemplateElement) {
           :alt="element.altText"
           class="element-content image-element"
         />
+
+        <!-- Divider Element -->
+        <div v-else-if="element.type === 'divider'" class="element-content divider-element">
+        </div>
 
         <!-- Resize Handles (only for selected element) -->
         <template v-if="element.id === selectedElementId">
@@ -377,151 +482,41 @@ function getElementStyle(element: TemplateElement) {
       </div>
     </div>
 
+    <!-- Undo/Redo Controls -->
+    <div class="canvas-controls">
+      <button 
+        class="control-btn"
+        :disabled="!templateStore.canUndo"
+        @click="templateStore.undo()"
+        title="Undo (Ctrl+Z)"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 7v6h6"/>
+          <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
+        </svg>
+        Undo
+      </button>
+      <button 
+        class="control-btn"
+        :disabled="!templateStore.canRedo"
+        @click="templateStore.redo()"
+        title="Redo (Ctrl+Y)"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 7v6h-6"/>
+          <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/>
+        </svg>
+        Redo
+      </button>
+    </div>
+
     <!-- Canvas info -->
     <div class="canvas-info">
-      <span>Canvas: {{ CANVAS_WIDTH }}×{{ CANVAS_HEIGHT }}px</span>
+      <span>Canvas: {{ CANVAS_WIDTH }}-{{ CANVAS_HEIGHT }}px</span>
       <span>Elements: {{ elements.length }}</span>
     </div>
   </div>
 </template>
 
-<style scoped>
-.canvas-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  width: 100%;
-  height: 100%;
-  padding: 2rem;
-}
 
-.canvas {
-  position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border: 2px solid #e1e8ed;
-  transition: border-color 0.2s;
-  overflow: hidden;
-  flex-shrink: 0;
-}
 
-.canvas.drag-over {
-  border-color: #007acc;
-  background-color: #f0f8ff;
-}
-
-.canvas-boundary {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  pointer-events: none;
-  border: 1px dashed #cbd5e0;
-}
-
-.canvas-empty {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: #95a5a6;
-  font-size: 1rem;
-  text-align: center;
-  pointer-events: none;
-}
-
-.canvas-element {
-  cursor: move;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  box-sizing: border-box;
-  border: 2px solid transparent;
-  transition: border-color 0.2s;
-}
-
-.canvas-element:hover {
-  border-color: #007acc;
-}
-
-.canvas-element.selected {
-  border-color: #007acc;
-  outline: 2px solid rgba(0, 122, 204, 0.3);
-  outline-offset: 2px;
-}
-
-.element-content {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  pointer-events: none;
-}
-
-.button-element {
-  width: 100%;
-  height: 100%;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-  pointer-events: none;
-}
-
-.image-element {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Resize Handles */
-.resize-handle {
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  background-color: #007acc;
-  border: 2px solid white;
-  border-radius: 50%;
-  z-index: 10;
-}
-
-.resize-handle.nw {
-  top: -5px;
-  left: -5px;
-  cursor: nw-resize;
-}
-
-.resize-handle.ne {
-  top: -5px;
-  right: -5px;
-  cursor: ne-resize;
-}
-
-.resize-handle.sw {
-  bottom: -5px;
-  left: -5px;
-  cursor: sw-resize;
-}
-
-.resize-handle.se {
-  bottom: -5px;
-  right: -5px;
-  cursor: se-resize;
-}
-
-.canvas-info {
-  display: flex;
-  gap: 2rem;
-  font-size: 0.875rem;
-  color: #7f8c8d;
-}
-
-.canvas-info span {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-</style>

@@ -2,6 +2,7 @@ import express, { Request, Response, NextFunction, Application } from 'express';
 import cors from 'cors';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { Template, CreateTemplateRequest, ApiResponse } from './types/template.types';
 
 const app: Application = express();
@@ -44,7 +45,7 @@ async function writeTemplates(templates: Template[]): Promise<void> {
 
 // Generate unique template ID
 function generateTemplateId(): string {
-  return `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return uuidv4();
 }
 
 // GET /api/templates - List all saved templates

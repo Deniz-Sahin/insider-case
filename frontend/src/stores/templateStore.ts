@@ -2,18 +2,50 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import type { Template, TemplateElement, CreateTemplateRequest } from '@/types/template.types';
 import { templateApi } from '@/services/templateApi';
+import { v4 as uuidv4 } from 'uuid';
 
 export const useTemplateStore = defineStore('template', () => {
   // State
   const templates = ref<Template[]>([]);
   const currentTemplate = ref<Template | null>(null);
   const selectedElement = ref<TemplateElement | null>(null);
+  const copiedElement = ref<TemplateElement | null>(null);
   const isLoading = ref(false);
   const error = ref<string | null>(null);
+
+  // Undo/Redo State
+  const history = ref<Template[]>([]);
+  const historyIndex = ref(-1);
+  const maxHistorySize = 50;
 
   // Getters
   const hasTemplates = computed(() => templates.value.length > 0);
   const templateCount = computed(() => templates.value.length);
+  const canUndo = computed(() => historyIndex.value > 0);
+  const canRedo = computed(() => historyIndex.value < history.value.length - 1);
+
+  // Helper function to save state to history
+  function saveToHistory() {
+    if (!currentTemplate.value) return;
+
+    // Deep clone the current template
+    const snapshot = JSON.parse(JSON.stringify(currentTemplate.value)) as Template;
+
+    // Remove any states after current index (when making new change after undo)
+    if (historyIndex.value < history.value.length - 1) {
+      history.value = history.value.slice(0, historyIndex.value + 1);
+    }
+
+    // Add new state
+    history.value.push(snapshot);
+
+    // Limit history size
+    if (history.value.length > maxHistorySize) {
+      history.value.shift();
+    } else {
+      historyIndex.value++;
+    }
+  }
 
   // Actions
   async function fetchTemplates() {
@@ -92,6 +124,15 @@ export const useTemplateStore = defineStore('template', () => {
   function setCurrentTemplate(template: Template | null) {
     currentTemplate.value = template;
     selectedElement.value = null;
+
+    // Initialize history when setting a new template
+    if (template) {
+      history.value = [JSON.parse(JSON.stringify(template)) as Template];
+      historyIndex.value = 0;
+    } else {
+      history.value = [];
+      historyIndex.value = -1;
+    }
   }
 
   function selectElement(element: TemplateElement | null) {
@@ -101,10 +142,11 @@ export const useTemplateStore = defineStore('template', () => {
   function addElement(element: TemplateElement) {
     if (currentTemplate.value) {
       currentTemplate.value.elements.push(element);
+      saveToHistory();
     }
   }
 
-  function updateElement(elementId: string, updates: Partial<TemplateElement>) {
+  function updateElement(elementId: string, updates: Partial<TemplateElement>, skipHistory = false) {
     if (currentTemplate.value) {
       const index = currentTemplate.value.elements.findIndex((el) => el.id === elementId);
       if (index !== -1) {
@@ -112,8 +154,15 @@ export const useTemplateStore = defineStore('template', () => {
           ...currentTemplate.value.elements[index],
           ...updates,
         } as TemplateElement;
+        if (!skipHistory) {
+          saveToHistory();
+        }
       }
     }
+  }
+
+  function saveCurrentStateToHistory() {
+    saveToHistory();
   }
 
   function removeElement(elementId: string) {
@@ -124,7 +173,103 @@ export const useTemplateStore = defineStore('template', () => {
       if (selectedElement.value?.id === elementId) {
         selectedElement.value = null;
       }
+      saveToHistory();
     }
+  }
+
+  function undo() {
+    if (canUndo.value) {
+      historyIndex.value--;
+      currentTemplate.value = JSON.parse(JSON.stringify(history.value[historyIndex.value])) as Template;
+      // Clear selection on undo to avoid referencing old element instances
+      selectedElement.value = null;
+    }
+  }
+
+  function redo() {
+    if (canRedo.value) {
+      historyIndex.value++;
+      currentTemplate.value = JSON.parse(JSON.stringify(history.value[historyIndex.value])) as Template;
+      // Clear selection on redo to avoid referencing old element instances
+      selectedElement.value = null;
+    }
+  }
+
+  function bringForward(elementId: string) {
+    if (!currentTemplate.value) return;
+
+    const element = currentTemplate.value.elements.find(el => el.id === elementId);
+    if (!element) return;
+
+    const currentZ = element.zIndex || 0;
+    element.zIndex = currentZ + 1;
+
+    saveToHistory();
+  }
+
+  function sendBackward(elementId: string) {
+    if (!currentTemplate.value) return;
+
+    const element = currentTemplate.value.elements.find(el => el.id === elementId);
+    if (!element) return;
+
+    const currentZ = element.zIndex || 0;
+    element.zIndex = currentZ - 1;
+
+    saveToHistory();
+  }
+
+  function bringToFront(elementId: string) {
+    if (!currentTemplate.value) return;
+
+    const element = currentTemplate.value.elements.find(el => el.id === elementId);
+    if (!element) return;
+
+    // Find max z-index
+    const maxZ = Math.max(0, ...currentTemplate.value.elements.map(el => el.zIndex || 0));
+    element.zIndex = maxZ + 1;
+
+    saveToHistory();
+  }
+
+  function sendToBack(elementId: string) {
+    if (!currentTemplate.value) return;
+
+    const element = currentTemplate.value.elements.find(el => el.id === elementId);
+    if (!element) return;
+
+    // Find min z-index
+    const minZ = Math.min(0, ...currentTemplate.value.elements.map(el => el.zIndex || 0));
+    element.zIndex = minZ - 1;
+
+    saveToHistory();
+  }
+
+  function copyElement() {
+    if (!selectedElement.value) return;
+
+    // Deep clone the selected element
+    copiedElement.value = JSON.parse(JSON.stringify(selectedElement.value)) as TemplateElement;
+  }
+
+  function pasteElement() {
+    if (!copiedElement.value || !currentTemplate.value) return;
+
+    // Generate new UUID for the pasted element
+    const newElement = JSON.parse(JSON.stringify(copiedElement.value)) as TemplateElement;
+    newElement.id = uuidv4();
+
+    // Offset position slightly so it's visible as a new element
+    newElement.position.x += 20;
+    newElement.position.y += 20;
+
+    // Add to template
+    currentTemplate.value.elements.push(newElement);
+
+    // Select the new element
+    selectedElement.value = newElement;
+
+    saveToHistory();
   }
 
   function clearError() {
@@ -136,11 +281,14 @@ export const useTemplateStore = defineStore('template', () => {
     templates,
     currentTemplate,
     selectedElement,
+    copiedElement,
     isLoading,
     error,
     // Getters
     hasTemplates,
     templateCount,
+    canUndo,
+    canRedo,
     // Actions
     fetchTemplates,
     createTemplate,
@@ -152,5 +300,14 @@ export const useTemplateStore = defineStore('template', () => {
     updateElement,
     removeElement,
     clearError,
+    undo,
+    redo,
+    saveCurrentStateToHistory,
+    bringForward,
+    sendBackward,
+    bringToFront,
+    sendToBack,
+    copyElement,
+    pasteElement,
   };
 });

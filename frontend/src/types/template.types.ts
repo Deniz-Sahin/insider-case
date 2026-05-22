@@ -11,7 +11,7 @@ export interface Size {
 }
 
 // Element types
-export type ElementType = 'heading' | 'text' | 'button' | 'image';
+export type ElementType = 'heading' | 'text' | 'button' | 'image' | 'divider';
 
 // Base element with common properties
 export interface BaseElement {
@@ -19,6 +19,7 @@ export interface BaseElement {
   type: ElementType;
   position: Position;
   size: Size;
+  zIndex?: number; // Optional z-index for layering
 }
 
 // Heading element
@@ -55,8 +56,16 @@ export interface ImageElement extends BaseElement {
   altText: string;
 }
 
+// Divider element
+export interface DividerElement extends BaseElement {
+  type: 'divider';
+  color: string;
+  thickness: number;
+  style: 'solid' | 'dashed' | 'dotted';
+}
+
 // Union type for all template elements
-export type TemplateElement = HeadingElement | TextElement | ButtonElement | ImageElement;
+export type TemplateElement = HeadingElement | TextElement | ButtonElement | ImageElement | DividerElement;
 
 // Main template interface
 export interface Template {
