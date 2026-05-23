@@ -1,4 +1,4 @@
-import '@testing-library/jest-dom'
+import '@testing-library/jest-dom';
 
 // Mock import.meta for Vite environment variables
 Object.defineProperty(globalThis, 'import', {
@@ -10,4 +10,4 @@ Object.defineProperty(globalThis, 'import', {
     },
   },
   writable: true,
-})
+});

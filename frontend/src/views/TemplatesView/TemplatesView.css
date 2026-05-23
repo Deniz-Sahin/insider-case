@@ -83,7 +83,9 @@
   border-radius: 12px;
   overflow: hidden;
   background: white;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
   display: flex;
   flex-direction: column;
 }

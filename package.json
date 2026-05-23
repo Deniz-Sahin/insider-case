@@ -9,7 +9,11 @@
     "client": "cd frontend && npm run dev",
     "server": "cd backend && npm run dev",
     "build": "cd backend && npm run build && cd ../frontend && npm run build && cd ..",
-    "test": "cd backend && npm test && cd ../frontend && npm test && cd .."
+    "test": "cd backend && npm test && cd ../frontend && npm test && cd ..",
+    "format": "cd frontend && npm run format",
+    "lint": "cd frontend && npm run lint",
+    "lint:check": "cd frontend && npm run lint:check",
+    "format:check": "cd frontend && npm run format:check"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

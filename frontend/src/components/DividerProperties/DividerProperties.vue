@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import './DividerProperties.css';
-import { ref, watch } from 'vue';
 import { useTemplateStore } from '@/stores/templateStore';
 import type { DividerElement } from '@/types/template.types';
+import { useColorProperty, useBoundedProperty } from '@/composables/useElementProperty';
+import { useLayerControls } from '@/composables/useLayerControls';
+import {
+  BasePropertyPanel,
+  PropertyGroup,
+  ColorPicker,
+  LayerControls,
+} from '@/components/BasePropertyPanel';
 
 const props = defineProps<{
   element: DividerElement;
@@ -10,165 +17,131 @@ const props = defineProps<{
 
 const templateStore = useTemplateStore();
 
-// Local state for form inputs
-const color = ref(props.element.color);
-const thickness = ref(props.element.thickness);
-const style = ref(props.element.style);
+// Use composables for property management
+const { property: color, updateProperty: updateColor } = useColorProperty(
+  props.element,
+  'color',
+  props.element.color
+);
 
-// Watch for external changes (e.g., switching selection)
-watch(() => props.element, (newElement) => {
-  color.value = newElement.color;
-  thickness.value = newElement.thickness;
-  style.value = newElement.style;
-}, { deep: true });
+const { property: thickness, updateProperty: _updateThickness } = useBoundedProperty(
+  props.element,
+  'thickness',
+  props.element.thickness,
+  { min: 1, max: 10 }
+);
 
-// Update methods - apply changes immediately to store
-function updateColor() {
-  templateStore.updateElement(props.element.id, { color: color.value });
-}
+const { property: style, updateProperty: updateStyle } = useColorProperty(
+  props.element,
+  'style',
+  props.element.style
+);
 
-function updateThickness() {
-  const size = Math.max(1, Math.min(10, thickness.value));
-  thickness.value = size;
-  templateStore.updateElement(props.element.id, { 
-    thickness: size,
-    size: { ...props.element.size, height: size }
+// Custom update for thickness that also updates height
+function handleThicknessUpdate() {
+  templateStore.updateElement(props.element.id, {
+    thickness: thickness.value,
+    size: { ...props.element.size, height: thickness.value },
   });
 }
 
-function updateStyle(newStyle: 'solid' | 'dashed' | 'dotted') {
+function handleStyleChange(newStyle: 'solid' | 'dashed' | 'dotted') {
   style.value = newStyle;
-  templateStore.updateElement(props.element.id, { style: newStyle });
+  updateStyle();
 }
+
+// Use layer controls composable
+const { canBringForward, canSendBackward, layerPosition, totalLayers, bringForward, sendBackward } =
+  useLayerControls(props.element);
 </script>
 
 <template>
-  <div class="properties-panel">
-    <div class="panel-header">
-      <h3>Divider Properties</h3>
-    </div>
+  <BasePropertyPanel title="Divider Properties">
+    <!-- Color -->
+    <PropertyGroup label="Line Color" html-for="divider-color">
+      <ColorPicker id="divider-color" v-model="color" @update:model-value="updateColor" />
+    </PropertyGroup>
 
-    <div class="properties-form">
-      <!-- Color -->
-      <div class="property-group">
-        <label for="divider-color">Line Color</label>
-        <div class="color-picker-group">
-          <input
-            id="divider-color"
-            v-model="color"
-            @input="updateColor"
-            type="color"
-            class="color-input"
-          />
-          <input
-            v-model="color"
-            @input="updateColor"
-            type="text"
-            class="property-input color-text"
-            placeholder="#e1e8ed"
-          />
-        </div>
-      </div>
-
-      <!-- Thickness -->
-      <div class="property-group">
-        <label for="divider-thickness">Thickness</label>
-        <div class="input-with-unit">
-          <input
-            id="divider-thickness"
-            v-model.number="thickness"
-            @input="updateThickness"
-            type="number"
-            min="1"
-            max="10"
-            class="property-input"
-          />
-          <span class="unit">px</span>
-        </div>
+    <!-- Thickness -->
+    <PropertyGroup label="Thickness" html-for="divider-thickness">
+      <div class="input-with-unit">
         <input
+          id="divider-thickness"
           v-model.number="thickness"
-          @input="updateThickness"
-          type="range"
+          type="number"
           min="1"
           max="10"
-          class="property-slider"
+          class="property-input"
+          @input="handleThicknessUpdate"
         />
+        <span class="unit">px</span>
       </div>
+      <input
+        v-model.number="thickness"
+        type="range"
+        min="1"
+        max="10"
+        class="property-slider"
+        @input="handleThicknessUpdate"
+      />
+    </PropertyGroup>
 
-      <!-- Style -->
-      <div class="property-group">
-        <label>Line Style</label>
-        <div class="style-buttons">
-          <button
-            :class="['style-btn', { active: style === 'solid' }]"
-            @click="updateStyle('solid')"
-          >
-            <div class="style-preview solid"></div>
-            Solid
-          </button>
-          <button
-            :class="['style-btn', { active: style === 'dashed' }]"
-            @click="updateStyle('dashed')"
-          >
-            <div class="style-preview dashed"></div>
-            Dashed
-          </button>
-          <button
-            :class="['style-btn', { active: style === 'dotted' }]"
-            @click="updateStyle('dotted')"
-          >
-            <div class="style-preview dotted"></div>
-            Dotted
-          </button>
-        </div>
+    <!-- Style -->
+    <PropertyGroup label="Line Style">
+      <div class="style-buttons">
+        <button
+          :class="['style-btn', { active: style === 'solid' }]"
+          @click="handleStyleChange('solid')"
+        >
+          <div class="style-preview solid"></div>
+          Solid
+        </button>
+        <button
+          :class="['style-btn', { active: style === 'dashed' }]"
+          @click="handleStyleChange('dashed')"
+        >
+          <div class="style-preview dashed"></div>
+          Dashed
+        </button>
+        <button
+          :class="['style-btn', { active: style === 'dotted' }]"
+          @click="handleStyleChange('dotted')"
+        >
+          <div class="style-preview dotted"></div>
+          Dotted
+        </button>
       </div>
+    </PropertyGroup>
 
-      <!-- Element Info -->
-      <div class="property-group info">
-        <label>Position</label>
-        <span class="info-text">
-          X: {{ Math.round(element.position.x) }}px, Y: {{ Math.round(element.position.y) }}px
-        </span>
-      </div>
+    <!-- Element Info -->
+    <PropertyGroup label="Position">
+      <span class="info-text">
+        X: {{ Math.round(element.position.x) }}px, Y: {{ Math.round(element.position.y) }}px
+      </span>
+    </PropertyGroup>
 
-      <div class="property-group info">
-        <label>Size</label>
-        <span class="info-text">
-          {{ Math.round(element.size.width) }}×{{ Math.round(element.size.height) }}px
-        </span>
-      </div>
+    <PropertyGroup label="Size">
+      <span class="info-text">
+        {{ Math.round(element.size.width) }}×{{ Math.round(element.size.height) }}px
+      </span>
+    </PropertyGroup>
 
-      <!-- Z-Index Controls -->
-      <div class="property-group">
-        <label>Layer Order</label>
-        <div class="layer-controls">
-          <button
-            class="layer-btn"
-            @click="templateStore.bringForward(element.id)"
-            title="Bring Forward"
-          >
-            ↑ Forward
-          </button>
-          <button
-            class="layer-btn"
-            @click="templateStore.sendBackward(element.id)"
-            title="Send Backward"
-          >
-            ↓ Backward
-          </button>
-        </div>
-        <span class="info-text" style="margin-top: 8px; display: block;">
-          Z-Index: {{ element.zIndex || 0 }}
-        </span>
-      </div>
-    </div>
+    <!-- Layer Controls -->
+    <PropertyGroup label="Layer Order">
+      <LayerControls
+        :can-bring-forward="canBringForward"
+        :can-send-backward="canSendBackward"
+        :layer-position="layerPosition"
+        :total-layers="totalLayers"
+        show-position-info
+        @bring-forward="bringForward"
+        @send-backward="sendBackward"
+      />
+    </PropertyGroup>
 
     <!-- Delete Button -->
-    <button 
-      class="btn-delete-element" 
-      @click="templateStore.removeElement(element.id)"
-    >
+    <button class="btn-delete-element" @click="templateStore.removeElement(element.id)">
       🗑️ Delete Element
     </button>
-  </div>
+  </BasePropertyPanel>
 </template>

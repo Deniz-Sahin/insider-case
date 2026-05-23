@@ -1,12 +1,12 @@
-import { createPinia, setActivePinia } from 'pinia'
+import { createPinia, setActivePinia } from 'pinia';
 
 /**
  * Setup function to be called before each test that uses Pinia stores
  */
 export function setupPiniaForTest() {
-  const pinia = createPinia()
-  setActivePinia(pinia)
-  return pinia
+  const pinia = createPinia();
+  setActivePinia(pinia);
+  return pinia;
 }
 
 /**
@@ -18,5 +18,5 @@ export function mockFetch(data: any, ok = true) {
       ok,
       json: () => Promise.resolve(data),
     } as Response)
-  ) as any
+  ) as any;
 }

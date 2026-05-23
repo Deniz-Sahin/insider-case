@@ -8,6 +8,7 @@ module.exports = {
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
+    '^uuid$': '<rootDir>/src/__tests__/__mocks__/uuid.ts',
   },
   transform: {
     '^.+\\.vue$': '@vue/vue3-jest',
@@ -19,7 +20,8 @@ module.exports = {
         module: 'esnext',
         moduleResolution: 'bundler',
         verbatimModuleSyntax: false,
-        types: ['jest', '@testing-library/jest-dom'],
+        lib: ['es2017', 'dom'],
+        types: ['jest', '@testing-library/jest-dom', 'vite/client'],
         baseUrl: '.',
         paths: {
           '@/*': ['./src/*']

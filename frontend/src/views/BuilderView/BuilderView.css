@@ -70,7 +70,8 @@
 }
 
 .btn-export,
-.btn-import {
+.btn-import,
+.btn-preview {
   padding: 0.5rem 1rem;
   background-color: white;
   color: #333;
@@ -83,10 +84,22 @@
 }
 
 .btn-export:hover,
-.btn-import:hover {
+.btn-import:hover,
+.btn-preview:hover {
   background-color: #f0f0f0;
   border-color: #007acc;
   color: #007acc;
+}
+
+.btn-preview {
+  background-color: #f0f7ff;
+  border-color: #6c63ff;
+  color: #6c63ff;
+}
+
+.btn-preview:hover {
+  background-color: #6c63ff;
+  color: white;
 }
 
 .btn-import {
@@ -113,8 +126,10 @@
   background-color: #f8f9fa;
   border-right: 1px solid #e1e8ed;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .properties {
@@ -154,5 +169,6 @@
   align-items: center;
   justify-content: center;
   background-color: #e9ecef;
-  overflow: auto;
+  overflow: hidden;
+  position: relative;
 }

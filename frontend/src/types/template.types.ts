@@ -65,7 +65,12 @@ export interface DividerElement extends BaseElement {
 }
 
 // Union type for all template elements
-export type TemplateElement = HeadingElement | TextElement | ButtonElement | ImageElement | DividerElement;
+export type TemplateElement =
+  | HeadingElement
+  | TextElement
+  | ButtonElement
+  | ImageElement
+  | DividerElement;
 
 // Main template interface
 export interface Template {

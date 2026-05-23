@@ -6,11 +6,21 @@ import { useTemplateStore } from '@/stores/templateStore';
 import { v4 as uuidv4 } from 'uuid';
 import ElementsSidebar from '@/components/ElementsSidebar';
 import TemplateCanvas from '@/components/TemplateCanvas';
+import TemplatePreview from '@/components/TemplatePreview/TemplatePreview.vue';
 import HeadingProperties from '@/components/HeadingProperties';
 import TextProperties from '@/components/TextProperties';
 import ButtonProperties from '@/components/ButtonProperties';
 import ImageProperties from '@/components/ImageProperties';
 import DividerProperties from '@/components/DividerProperties';
+import {
+  SUCCESS_MESSAGES,
+  ERROR_MESSAGES,
+  CONFIRM_MESSAGES,
+  INFO_MESSAGES,
+  EDITOR_CONFIG,
+  FILE_CONFIG,
+  ROUTES,
+} from '@/constants';
 
 const router = useRouter();
 const route = useRoute();
@@ -18,6 +28,7 @@ const templateStore = useTemplateStore();
 
 const templateName = ref('Untitled Template');
 const hasUnsavedChanges = ref(false);
+const isPreviewOpen = ref(false);
 
 // Watch for changes in current template
 watch(
@@ -43,8 +54,8 @@ onMounted(() => {
       id: '',
       name: 'Untitled Template',
       elements: [],
-      canvasSize: { width: 400, height: 500 },
-      backgroundColor: '#ffffff',
+      canvasSize: EDITOR_CONFIG.DEFAULT_CANVAS_SIZE,
+      backgroundColor: EDITOR_CONFIG.DEFAULT_BACKGROUND_COLOR,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -54,12 +65,38 @@ onMounted(() => {
 
 const goBack = () => {
   if (hasUnsavedChanges.value) {
-    if (!confirm('You have unsaved changes. Are you sure you want to leave?')) {
+    if (!confirm(CONFIRM_MESSAGES.UNSAVED_CHANGES)) {
       return;
     }
   }
-  router.push('/');
+  router.push(ROUTES.HOME);
 };
+
+const openPreview = () => {
+  isPreviewOpen.value = true;
+};
+
+const closePreview = () => {
+  isPreviewOpen.value = false;
+};
+
+// Handle ESC key to close preview
+const handleKeyDown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && isPreviewOpen.value) {
+    closePreview();
+  }
+};
+
+onMounted(() => {
+  document.addEventListener('keydown', handleKeyDown);
+});
+
+watch(
+  () => route.path,
+  () => {
+    document.removeEventListener('keydown', handleKeyDown);
+  }
+);
 
 const saveTemplate = async () => {
   if (!templateStore.currentTemplate) return;
@@ -80,9 +117,9 @@ const saveTemplate = async () => {
     }
 
     hasUnsavedChanges.value = false;
-    alert('Template saved successfully!');
-  } catch (error) {
-    alert('Failed to save template. Please try again.');
+    alert(SUCCESS_MESSAGES.TEMPLATE_SAVED);
+  } catch {
+    alert(ERROR_MESSAGES.TEMPLATE_SAVE_FAILED);
   }
 };
 
@@ -90,8 +127,8 @@ const exportTemplate = () => {
   if (!templateStore.currentTemplate) return;
 
   // Remove id from each element
-  const elementsWithoutIds = templateStore.currentTemplate.elements.map(element => {
-    const { id, ...elementWithoutId } = element;
+  const elementsWithoutIds = templateStore.currentTemplate.elements.map((element) => {
+    const { id: _id, ...elementWithoutId } = element;
     return elementWithoutId;
   });
 
@@ -104,11 +141,11 @@ const exportTemplate = () => {
   };
 
   const dataStr = JSON.stringify(templateData, null, 2);
-  const dataBlob = new Blob([dataStr], { type: 'application/json' });
+  const dataBlob = new Blob([dataStr], { type: FILE_CONFIG.EXPORT_FILE_TYPE });
   const url = URL.createObjectURL(dataBlob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `${templateName.value.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_template.json`;
+  link.download = `${templateName.value.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_template${FILE_CONFIG.EXPORT_FILE_EXTENSION}`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -135,7 +172,7 @@ const importTemplate = (event: Event) => {
 
       // Validate imported data
       if (!importedData.elements || !Array.isArray(importedData.elements)) {
-        alert('Invalid template file: missing or invalid elements array');
+        alert(ERROR_MESSAGES.INVALID_TEMPLATE_FILE);
         return;
       }
 
@@ -150,17 +187,17 @@ const importTemplate = (event: Event) => {
         id: '',
         name: importedData.name || 'Imported Template',
         elements: elementsWithNewIds,
-        canvasSize: importedData.canvasSize || { width: 400, height: 500 },
-        backgroundColor: importedData.backgroundColor || '#ffffff',
+        canvasSize: importedData.canvasSize || EDITOR_CONFIG.DEFAULT_CANVAS_SIZE,
+        backgroundColor: importedData.backgroundColor || EDITOR_CONFIG.DEFAULT_BACKGROUND_COLOR,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
 
       templateName.value = importedData.name || 'Imported Template';
       hasUnsavedChanges.value = true;
-      alert('Template imported successfully! Click "Save Template" to save it.');
-    } catch (error) {
-      alert('Failed to import template. Please make sure the file is a valid JSON template.');
+      alert(SUCCESS_MESSAGES.TEMPLATE_IMPORTED);
+    } catch {
+      alert(ERROR_MESSAGES.TEMPLATE_IMPORT_FAILED);
     }
   };
 
@@ -174,25 +211,28 @@ const importTemplate = (event: Event) => {
   <div class="builder-view">
     <header class="builder-header">
       <button class="btn-back" @click="goBack">← Back</button>
-      <input 
-        v-model="templateName" 
-        class="template-name-input" 
+      <input
+        v-model="templateName"
+        class="template-name-input"
         placeholder="Template Name"
-        @input="hasUnsavedChanges = true" 
+        @input="hasUnsavedChanges = true"
       />
       <div class="header-actions">
-        <span v-if="hasUnsavedChanges" class="unsaved-indicator">● Unsaved changes</span>
-        <button class="btn-import" @click="triggerImport" title="Import Template">
-          📥 Import
+        <span v-if="hasUnsavedChanges" class="unsaved-indicator">{{
+          INFO_MESSAGES.UNSAVED_CHANGES
+        }}</span>
+        <button class="btn-preview" title="Preview Template" @click="openPreview">
+          👁️ Preview
         </button>
-        <button class="btn-export" @click="exportTemplate" title="Export Template">
+        <button class="btn-import" title="Import Template" @click="triggerImport">📥 Import</button>
+        <button class="btn-export" title="Export Template" @click="exportTemplate">
           📤 Export
         </button>
         <button class="btn-save" @click="saveTemplate">Save Template</button>
-        <input 
+        <input
           ref="fileInput"
-          type="file" 
-          accept="application/json,.json"
+          type="file"
+          :accept="FILE_CONFIG.IMPORT_ACCEPT_TYPES"
           style="display: none"
           @change="importTemplate"
         />
@@ -210,42 +250,54 @@ const importTemplate = (event: Event) => {
 
       <div class="properties">
         <!-- Heading Properties -->
-        <HeadingProperties 
+        <HeadingProperties
           v-if="templateStore.selectedElement?.type === 'heading'"
+          :key="templateStore.selectedElement.id"
           :element="templateStore.selectedElement"
         />
 
         <!-- Text Properties -->
-        <TextProperties 
+        <TextProperties
           v-else-if="templateStore.selectedElement?.type === 'text'"
+          :key="templateStore.selectedElement.id"
           :element="templateStore.selectedElement"
         />
 
         <!-- Button Properties -->
-        <ButtonProperties 
+        <ButtonProperties
           v-else-if="templateStore.selectedElement?.type === 'button'"
+          :key="templateStore.selectedElement.id"
           :element="templateStore.selectedElement"
         />
 
         <!-- Image Properties -->
-        <ImageProperties 
+        <ImageProperties
           v-else-if="templateStore.selectedElement?.type === 'image'"
+          :key="templateStore.selectedElement.id"
           :element="templateStore.selectedElement"
         />
 
         <!-- Divider Properties -->
-        <DividerProperties 
+        <DividerProperties
           v-else-if="templateStore.selectedElement?.type === 'divider'"
+          :key="templateStore.selectedElement.id"
           :element="templateStore.selectedElement"
         />
 
         <!-- Empty State -->
         <div v-else class="properties-empty">
           <div class="empty-icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-              <line x1="9" y1="9" x2="15" y2="15"/>
-              <line x1="15" y1="9" x2="9" y2="15"/>
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="9" y1="9" x2="15" y2="15" />
+              <line x1="15" y1="9" x2="9" y2="15" />
             </svg>
           </div>
           <h4>No Element Selected</h4>
@@ -253,8 +305,13 @@ const importTemplate = (event: Event) => {
         </div>
       </div>
     </div>
+
+    <!-- Preview Modal -->
+    <TemplatePreview
+      v-if="templateStore.currentTemplate"
+      :template="templateStore.currentTemplate"
+      :is-open="isPreviewOpen"
+      @close="closePreview"
+    />
   </div>
 </template>
-
-
-

@@ -1,8 +1,20 @@
 ﻿<script setup lang="ts">
 import './ButtonProperties.css';
-import { ref, watch } from 'vue';
 import { useTemplateStore } from '@/stores/templateStore';
 import type { ButtonElement } from '@/types/template.types';
+import {
+  useElementProperty,
+  useBoundedProperty,
+  useColorProperty,
+} from '@/composables/useElementProperty';
+import { useLayerControls } from '@/composables/useLayerControls';
+import {
+  BasePropertyPanel,
+  PropertyGroup,
+  ColorPicker,
+  NumberSlider,
+  LayerControls,
+} from '@/components/BasePropertyPanel';
 
 const props = defineProps<{
   element: ButtonElement;
@@ -10,178 +22,112 @@ const props = defineProps<{
 
 const templateStore = useTemplateStore();
 
-// Local state for form inputs
-const text = ref(props.element.text);
-const backgroundColor = ref(props.element.backgroundColor);
-const textColor = ref(props.element.textColor);
-const borderRadius = ref(props.element.borderRadius);
+// Use composables for property management
+const { property: text, updateProperty: updateText } = useElementProperty(
+  props.element,
+  'text',
+  props.element.text
+);
 
-// Watch for external changes (e.g., switching selection)
-watch(() => props.element, (newElement) => {
-  text.value = newElement.text;
-  backgroundColor.value = newElement.backgroundColor;
-  textColor.value = newElement.textColor;
-  borderRadius.value = newElement.borderRadius;
-}, { deep: true });
+const { property: backgroundColor, updateProperty: updateBackgroundColor } = useColorProperty(
+  props.element,
+  'backgroundColor',
+  props.element.backgroundColor
+);
 
-// Update methods - apply changes immediately to store
-function updateText() {
-  templateStore.updateElement(props.element.id, { text: text.value });
-}
+const { property: textColor, updateProperty: updateTextColor } = useColorProperty(
+  props.element,
+  'textColor',
+  props.element.textColor
+);
 
-function updateBackgroundColor() {
-  templateStore.updateElement(props.element.id, { backgroundColor: backgroundColor.value });
-}
+const { property: borderRadius, updateProperty: updateBorderRadius } = useBoundedProperty(
+  props.element,
+  'borderRadius',
+  props.element.borderRadius,
+  { min: 0, max: 50 }
+);
 
-function updateTextColor() {
-  templateStore.updateElement(props.element.id, { textColor: textColor.value });
-}
-
-function updateBorderRadius() {
-  const radius = Math.max(0, Math.min(50, borderRadius.value));
-  borderRadius.value = radius;
-  templateStore.updateElement(props.element.id, { borderRadius: radius });
-}
-
-
+// Use layer controls composable
+const { canBringForward, canSendBackward, layerPosition, totalLayers, bringForward, sendBackward } =
+  useLayerControls(props.element);
 </script>
 
 <template>
-  <div class="properties-panel">
-    <div class="panel-header">
-      <h3>Button Properties</h3>
-    </div>
+  <BasePropertyPanel title="Button Properties">
+    <!-- Button Text -->
+    <PropertyGroup label="Button Text" html-for="button-text">
+      <input
+        id="button-text"
+        v-model="text"
+        type="text"
+        class="property-input"
+        placeholder="Enter button text..."
+        @input="() => updateText()"
+      />
+    </PropertyGroup>
 
-    <div class="properties-form">
-      <!-- Button Text -->
-      <div class="property-group">
-        <label for="button-text">Button Text</label>
-        <input
-          id="button-text"
-          v-model="text"
-          @input="updateText"
-          type="text"
-          class="property-input"
-          placeholder="Enter button text..."
-        />
-      </div>
+    <!-- Background Color -->
+    <PropertyGroup label="Background Color" html-for="button-bg-color">
+      <ColorPicker
+        id="button-bg-color"
+        v-model="backgroundColor"
+        placeholder="#007acc"
+        @update:model-value="updateBackgroundColor"
+      />
+    </PropertyGroup>
 
-      <!-- Background Color -->
-      <div class="property-group">
-        <label for="button-bg-color">Background Color</label>
-        <div class="color-picker-group">
-          <input
-            id="button-bg-color"
-            v-model="backgroundColor"
-            @input="updateBackgroundColor"
-            type="color"
-            class="color-input"
-          />
-          <input
-            v-model="backgroundColor"
-            @input="updateBackgroundColor"
-            type="text"
-            class="property-input color-text"
-            placeholder="#007acc"
-          />
-        </div>
-      </div>
+    <!-- Text Color -->
+    <PropertyGroup label="Text Color" html-for="button-text-color">
+      <ColorPicker
+        id="button-text-color"
+        v-model="textColor"
+        placeholder="#ffffff"
+        @update:model-value="updateTextColor"
+      />
+    </PropertyGroup>
 
-      <!-- Text Color -->
-      <div class="property-group">
-        <label for="button-text-color">Text Color</label>
-        <div class="color-picker-group">
-          <input
-            id="button-text-color"
-            v-model="textColor"
-            @input="updateTextColor"
-            type="color"
-            class="color-input"
-          />
-          <input
-            v-model="textColor"
-            @input="updateTextColor"
-            type="text"
-            class="property-input color-text"
-            placeholder="#ffffff"
-          />
-        </div>
-      </div>
+    <!-- Border Radius -->
+    <PropertyGroup label="Border Radius" html-for="button-border-radius">
+      <NumberSlider
+        id="button-border-radius"
+        v-model="borderRadius"
+        :min="0"
+        :max="50"
+        unit="px"
+        @update:model-value="updateBorderRadius"
+      />
+    </PropertyGroup>
 
-      <!-- Border Radius -->
-      <div class="property-group">
-        <label for="button-border-radius">Border Radius</label>
-        <div class="input-with-unit">
-          <input
-            id="button-border-radius"
-            v-model.number="borderRadius"
-            @input="updateBorderRadius"
-            type="number"
-            min="0"
-            max="50"
-            class="property-input"
-          />
-          <span class="unit">px</span>
-        </div>
-        <input
-          v-model.number="borderRadius"
-          @input="updateBorderRadius"
-          type="range"
-          min="0"
-          max="50"
-          class="property-slider"
-        />
-      </div>
+    <!-- Element Info -->
+    <PropertyGroup label="Position">
+      <span class="info-text">
+        X: {{ Math.round(element.position.x) }}px, Y: {{ Math.round(element.position.y) }}px
+      </span>
+    </PropertyGroup>
 
-      <!-- Element Info -->
-      <div class="property-group info">
-        <label>Position</label>
-        <span class="info-text">
-          X: {{ Math.round(element.position.x) }}px, Y: {{ Math.round(element.position.y) }}px
-        </span>
-      </div>
+    <PropertyGroup label="Size">
+      <span class="info-text">
+        {{ Math.round(element.size.width) }}×{{ Math.round(element.size.height) }}px
+      </span>
+    </PropertyGroup>
 
-      <div class="property-group info">
-        <label>Size</label>
-        <span class="info-text">
-          {{ Math.round(element.size.width) }}×{{ Math.round(element.size.height) }}px
-        </span>
-      </div>
-
-      <!-- Z-Index Controls -->
-      <div class="property-group">
-        <label>Layer Order</label>
-        <div class="layer-controls">
-          <button
-            class="layer-btn"
-            @click="templateStore.bringForward(element.id)"
-            title="Bring Forward"
-          >
-            ↑ Forward
-          </button>
-          <button
-            class="layer-btn"
-            @click="templateStore.sendBackward(element.id)"
-            title="Send Backward"
-          >
-            ↓ Backward
-          </button>
-        </div>
-        <span class="info-text" style="margin-top: 8px; display: block;">
-          Z-Index: {{ element.zIndex || 0 }}
-        </span>
-      </div>
-    </div>
+    <!-- Layer Controls -->
+    <PropertyGroup label="Layer Order">
+      <LayerControls
+        :can-bring-forward="canBringForward"
+        :can-send-backward="canSendBackward"
+        :layer-position="layerPosition"
+        :total-layers="totalLayers"
+        show-position-info
+        @bring-forward="bringForward"
+        @send-backward="sendBackward"
+      />
+    </PropertyGroup>
 
     <!-- Delete Button -->
-    <button 
-      class="btn-delete-element" 
-      @click="templateStore.removeElement(element.id)"
-    >
+    <button class="btn-delete-element" @click="templateStore.removeElement(element.id)">
       🗑️ Delete Element
     </button>
-  </div>
+  </BasePropertyPanel>
 </template>
-
-
-

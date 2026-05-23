@@ -2,7 +2,7 @@
 export function getApiBaseUrl(): string {
   // In Jest tests, import.meta won't be available, so we return the default
   try {
-    // @ts-ignore - import.meta.env is available in Vite
+    // import.meta.env is available in Vite but not in Jest
     return import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3001';
   } catch {
     return 'http://localhost:3001';

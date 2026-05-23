@@ -3,6 +3,7 @@ import './TemplatesView.css';
 import { onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useTemplateStore } from '@/stores/templateStore';
+import { CONFIRM_MESSAGES, INFO_MESSAGES, ROUTES } from '@/constants';
 
 const router = useRouter();
 const templateStore = useTemplateStore();
@@ -12,15 +13,15 @@ onMounted(() => {
 });
 
 const createNewTemplate = () => {
-  router.push('/builder');
+  router.push(ROUTES.BUILDER);
 };
 
 const editTemplate = (id: string) => {
-  router.push(`/builder/${id}`);
+  router.push(ROUTES.BUILDER_WITH_ID(id));
 };
 
 const deleteTemplate = async (id: string) => {
-  if (confirm('Are you sure you want to delete this template?')) {
+  if (confirm(CONFIRM_MESSAGES.DELETE_TEMPLATE)) {
     await templateStore.deleteTemplate(id);
   }
 };
@@ -35,24 +36,20 @@ const deleteTemplate = async (id: string) => {
       </button>
     </header>
 
-    <div v-if="templateStore.isLoading" class="loading">Loading templates...</div>
+    <div v-if="templateStore.isLoading" class="loading">{{ INFO_MESSAGES.LOADING_TEMPLATES }}</div>
 
     <div v-else-if="templateStore.error" class="error">
       {{ templateStore.error }}
     </div>
 
     <div v-else-if="!templateStore.hasTemplates" class="empty-state">
-      <h2>No templates yet</h2>
-      <p>Create your first popup template to get started</p>
+      <h2>{{ INFO_MESSAGES.NO_TEMPLATES }}</h2>
+      <p>{{ INFO_MESSAGES.NO_TEMPLATES_DESCRIPTION }}</p>
       <button class="btn-primary" @click="createNewTemplate">Create Template</button>
     </div>
 
     <div v-else class="templates-grid">
-      <div
-        v-for="template in templateStore.templates"
-        :key="template.id"
-        class="template-card"
-      >
+      <div v-for="template in templateStore.templates" :key="template.id" class="template-card">
         <div class="template-info">
           <h3>{{ template.name }}</h3>
           <div class="template-meta">
@@ -69,6 +66,3 @@ const deleteTemplate = async (id: string) => {
     </div>
   </div>
 </template>
-
-
-

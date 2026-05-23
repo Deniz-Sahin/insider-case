@@ -1,8 +1,11 @@
 ﻿<script setup lang="ts">
 import './ImageProperties.css';
-import { ref, watch } from 'vue';
+import { ref } from 'vue';
 import { useTemplateStore } from '@/stores/templateStore';
 import type { ImageElement } from '@/types/template.types';
+import { useElementProperty } from '@/composables/useElementProperty';
+import { useLayerControls } from '@/composables/useLayerControls';
+import { BasePropertyPanel, PropertyGroup, LayerControls } from '@/components/BasePropertyPanel';
 
 const props = defineProps<{
   element: ImageElement;
@@ -10,112 +13,88 @@ const props = defineProps<{
 
 const templateStore = useTemplateStore();
 
-// Local state for form inputs
-const url = ref(props.element.url);
-const altText = ref(props.element.altText);
+const { property: url, updateProperty: updateUrl } = useElementProperty(
+  props.element,
+  'url',
+  props.element.url
+);
+
+const { property: altText, updateProperty: updateAltText } = useElementProperty(
+  props.element,
+  'altText',
+  props.element.altText
+);
+
 const imageError = ref(false);
 
-// Watch for external changes (e.g., switching selection)
-watch(() => props.element, (newElement) => {
-  url.value = newElement.url;
-  altText.value = newElement.altText;
+function handleUrlChange() {
   imageError.value = false;
-}, { deep: true });
-
-// Update methods - apply changes immediately to store
-function updateUrl() {
-  imageError.value = false;
-  templateStore.updateElement(props.element.id, { url: url.value });
+  updateUrl();
 }
 
-function updateAltText() {
-  templateStore.updateElement(props.element.id, { altText: altText.value });
+function handleAltTextChange() {
+  updateAltText();
 }
 
-function handleImageError() {
-  imageError.value = true;
-}
-
-function handleImageLoad() {
-  imageError.value = false;
-}
-
+const { canBringForward, canSendBackward, layerPosition, totalLayers, bringForward, sendBackward } =
+  useLayerControls(props.element);
 </script>
 
 <template>
-  <div class="properties-panel">
-    <div class="panel-header">
-      <h3>Image Properties</h3>
-    </div>
+  <BasePropertyPanel title="Image Properties">
+    <PropertyGroup label="Image URL" html-for="image-url">
+      <input
+        id="image-url"
+        v-model="url"
+        type="text"
+        class="property-input"
+        placeholder="https://example.com/image.jpg"
+        @input="handleUrlChange"
+      />
+      <p v-if="imageError" class="error-message">Failed to load image</p>
+    </PropertyGroup>
 
-    <div class="properties-form">
-      <!-- Image URL -->
-      <div class="property-group">
-        <label for="image-url">Image URL</label>
-        <input
-          id="image-url"
-          v-model="url"
-          @input="updateUrl"
-          type="text"
-          class="property-input"
-          placeholder="https://example.com/image.jpg"
-        />
-        <p v-if="imageError" class="error-message">
-          âš ï¸ Failed to load image. Check URL.
-        </p>
-      </div>
-
-      <!-- Alt Text -->
-      <div class="property-group">
-        <label for="image-alt">Alt Text</label>
-        <input
-          id="image-alt"
-          v-model="altText"
-          @input="updateAltText"
-          type="text"
-          class="property-input"
-          placeholder="Describe the image..."
-        />
-        <p class="help-text">
-          Describes the image for accessibility
-        </p>
-      </div>
-
-      <!-- Z-Index Controls -->
-      <div class="property-group">
-        <label>Layer Order</label>
-        <div class="layer-controls">
-          <button
-            class="layer-btn"
-            @click="templateStore.bringForward(element.id)"
-            title="Bring Forward"
-          >
-            ↑ Forward
-          </button>
-          <button
-            class="layer-btn"
-            @click="templateStore.sendBackward(element.id)"
-            title="Send Backward"
-          >
-            ↓ Backward
-          </button>
-        </div>
-        <span class="info-text" style="margin-top: 8px; display: block;">
-          Z-Index: {{ element.zIndex || 0 }}
-        </span>
-      </div>
-
-    </div>
-
-    <!-- Delete Button -->
-    <button 
-      class="btn-delete-element" 
-      @click="templateStore.removeElement(element.id)"
+    <PropertyGroup
+      label="Alt Text"
+      html-for="image-alt"
+      help-text="Describes the image for accessibility"
     >
+      <input
+        id="image-alt"
+        v-model="altText"
+        type="text"
+        class="property-input"
+        placeholder="Describe the image..."
+        @input="handleAltTextChange"
+      />
+    </PropertyGroup>
+
+    <PropertyGroup label="Position">
+      <span class="info-text">
+        X: {{ Math.round(element.position.x) }}px, Y: {{ Math.round(element.position.y) }}px
+      </span>
+    </PropertyGroup>
+
+    <PropertyGroup label="Size">
+      <span class="info-text">
+        {{ Math.round(element.size.width) }}×{{ Math.round(element.size.height) }}px
+      </span>
+    </PropertyGroup>
+
+    <PropertyGroup label="Layer Order">
+      <LayerControls
+        :can-bring-forward="canBringForward"
+        :can-send-backward="canSendBackward"
+        :layer-position="layerPosition"
+        :total-layers="totalLayers"
+        show-position-info
+        @bring-forward="bringForward"
+        @send-backward="sendBackward"
+      />
+    </PropertyGroup>
+
+    <button class="btn-delete-element" @click="templateStore.removeElement(element.id)">
       🗑️ Delete Element
     </button>
-  </div>
+  </BasePropertyPanel>
 </template>
-
-
-

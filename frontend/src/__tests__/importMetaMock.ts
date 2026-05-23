@@ -2,6 +2,7 @@
 export const importMetaMock = {
   env: {
     VITE_API_BASE_URL: 'http://localhost:3001',
+    DEV: false, // Set to false for tests (production-like behavior)
   },
 };
 

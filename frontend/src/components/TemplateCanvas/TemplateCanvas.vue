@@ -1,16 +1,16 @@
 ﻿<script setup lang="ts">
 import './TemplateCanvas.css';
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTemplateStore } from '@/stores/templateStore';
 import { v4 as uuidv4 } from 'uuid';
-import type { 
-  TemplateElement, 
-  ElementType, 
-  HeadingElement, 
-  TextElement, 
-  ButtonElement, 
+import type {
+  TemplateElement,
+  ElementType,
+  HeadingElement,
+  TextElement,
+  ButtonElement,
   ImageElement,
-  DividerElement
+  DividerElement,
 } from '@/types/template.types';
 
 const templateStore = useTemplateStore();
@@ -18,6 +18,10 @@ const templateStore = useTemplateStore();
 // Canvas size (fixed 400x500px as specified)
 const CANVAS_WIDTH = 400;
 const CANVAS_HEIGHT = 500;
+
+// Grid settings
+const GRID_SIZE = 10; // 10px grid
+const snapToGrid = ref(false); // Grid snap toggle
 
 // Refs
 const canvasRef = ref<HTMLDivElement | null>(null);
@@ -28,6 +32,8 @@ const resizeHandle = ref<string | null>(null);
 const resizeStart = ref({ x: 0, y: 0, width: 0, height: 0 });
 const initialDragPosition = ref<{ x: number; y: number } | null>(null);
 const initialResizeSize = ref<{ width: number; height: number } | null>(null);
+const isNudging = ref(false);
+const nudgeStartPosition = ref<{ x: number; y: number } | null>(null);
 
 // Computed
 const canvasStyle = computed(() => ({
@@ -137,6 +143,12 @@ function onDragLeave() {
   isDraggingOver.value = false;
 }
 
+// Helper function to snap coordinates to grid
+function snapToGridFn(value: number): number {
+  if (!snapToGrid.value) return value;
+  return Math.round(value / GRID_SIZE) * GRID_SIZE;
+}
+
 // Element selection
 function selectElement(element: TemplateElement, event: MouseEvent) {
   event.stopPropagation();
@@ -177,17 +189,25 @@ function onDragMove(event: MouseEvent) {
   let x = event.clientX - rect.left - dragOffset.value.x;
   let y = event.clientY - rect.top - dragOffset.value.y;
 
+  // Snap to grid if enabled
+  x = snapToGridFn(x);
+  y = snapToGridFn(y);
+
   // Constrain to canvas bounds
   x = Math.max(0, Math.min(x, CANVAS_WIDTH - draggingElement.value.size.width));
   y = Math.max(0, Math.min(y, CANVAS_HEIGHT - draggingElement.value.size.height));
 
   // Update position without saving to history during drag
-  templateStore.updateElement(draggingElement.value.id, {
-    position: { x, y },
-  }, true);
+  templateStore.updateElement(
+    draggingElement.value.id,
+    {
+      position: { x, y },
+    },
+    true
+  );
 }
 
-function stopDragElement(event?: MouseEvent) {
+function stopDragElement(_event?: MouseEvent) {
   const element = draggingElement.value;
   const initialPos = initialDragPosition.value;
 
@@ -200,10 +220,19 @@ function stopDragElement(event?: MouseEvent) {
 
   // Only save to history if position actually changed
   if (element && initialPos && templateStore.currentTemplate) {
-    const currentElement = templateStore.currentTemplate.elements.find(el => el.id === element.id);
-    if (currentElement && 
-        (currentElement.position.x !== initialPos.x || currentElement.position.y !== initialPos.y)) {
-      console.log('Drag complete - saving history. From:', initialPos, 'To:', currentElement.position);
+    const currentElement = templateStore.currentTemplate.elements.find(
+      (el) => el.id === element.id
+    );
+    if (
+      currentElement &&
+      (currentElement.position.x !== initialPos.x || currentElement.position.y !== initialPos.y)
+    ) {
+      console.log(
+        'Drag complete - saving history. From:',
+        initialPos,
+        'To:',
+        currentElement.position
+      );
       templateStore.saveCurrentStateToHistory();
     } else {
       console.log('Drag complete - NO CHANGE, skipping history');
@@ -263,9 +292,13 @@ function onResizeMove(event: MouseEvent) {
   newHeight = Math.min(newHeight, maxHeight);
 
   // Update size without saving to history during resize
-  templateStore.updateElement(draggingElement.value.id, {
-    size: { width: newWidth, height: newHeight },
-  }, true);
+  templateStore.updateElement(
+    draggingElement.value.id,
+    {
+      size: { width: newWidth, height: newHeight },
+    },
+    true
+  );
 }
 
 function stopResize() {
@@ -280,25 +313,26 @@ function stopResize() {
 
   // Only save to history if size actually changed
   if (element && initialSize && templateStore.currentTemplate) {
-    const currentElement = templateStore.currentTemplate.elements.find(el => el.id === element.id);
-    if (currentElement && 
-        (currentElement.size.width !== initialSize.width || currentElement.size.height !== initialSize.height)) {
+    const currentElement = templateStore.currentTemplate.elements.find(
+      (el) => el.id === element.id
+    );
+    if (
+      currentElement &&
+      (currentElement.size.width !== initialSize.width ||
+        currentElement.size.height !== initialSize.height)
+    ) {
       templateStore.saveCurrentStateToHistory();
-    }
-  }
-}
-
-// Delete element
-function deleteElement(event: KeyboardEvent) {
-  if (event.key === 'Delete' || event.key === 'Backspace') {
-    if (templateStore.selectedElement) {
-      templateStore.removeElement(templateStore.selectedElement.id);
     }
   }
 }
 
 // Undo/Redo keyboard shortcuts
 function handleKeyboardShortcuts(event: KeyboardEvent) {
+  // Check if user is typing in an input/textarea/contenteditable
+  const target = event.target as HTMLElement;
+  const isTyping =
+    target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+
   // Check for Ctrl+Z (Undo)
   if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
     event.preventDefault();
@@ -326,11 +360,94 @@ function handleKeyboardShortcuts(event: KeyboardEvent) {
       templateStore.pasteElement();
     }
   }
-  // Delete/Backspace
+  // Delete/Backspace - only if not typing in a field
   else if (event.key === 'Delete' || event.key === 'Backspace') {
-    if (templateStore.selectedElement) {
+    if (!isTyping && templateStore.selectedElement) {
       event.preventDefault();
       templateStore.removeElement(templateStore.selectedElement.id);
+    }
+  }
+  // Arrow keys for nudging - only if not typing in a field
+  else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    if (!isTyping && templateStore.selectedElement) {
+      event.preventDefault();
+      nudgeElement(event.key, event.shiftKey);
+    }
+  }
+}
+
+// Nudge element with arrow keys
+function nudgeElement(key: string, shiftKey: boolean) {
+  if (!templateStore.selectedElement || !templateStore.currentTemplate) return;
+
+  // Get fresh element reference by ID
+  const elementId = templateStore.selectedElement.id;
+  const element = templateStore.currentTemplate.elements.find((el) => el.id === elementId);
+  if (!element) return;
+
+  // Store initial position on first nudge
+  if (!isNudging.value) {
+    isNudging.value = true;
+    nudgeStartPosition.value = { ...element.position };
+  }
+
+  // If grid snap is enabled, use grid size for nudging
+  const nudgeAmount = snapToGrid.value ? GRID_SIZE : shiftKey ? 10 : 1;
+  let newX = element.position.x;
+  let newY = element.position.y;
+
+  switch (key) {
+    case 'ArrowUp':
+      newY = Math.max(0, newY - nudgeAmount);
+      break;
+    case 'ArrowDown':
+      newY = Math.min(CANVAS_HEIGHT - element.size.height, newY + nudgeAmount);
+      break;
+    case 'ArrowLeft':
+      newX = Math.max(0, newX - nudgeAmount);
+      break;
+    case 'ArrowRight':
+      newX = Math.min(CANVAS_WIDTH - element.size.width, newX + nudgeAmount);
+      break;
+  }
+
+  // Update without saving to history (skipHistory = true)
+  templateStore.updateElement(
+    elementId,
+    {
+      position: { x: newX, y: newY },
+    },
+    true
+  );
+}
+
+// Handle key release to save nudge to history
+function handleKeyUp(event: KeyboardEvent) {
+  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+    if (
+      isNudging.value &&
+      nudgeStartPosition.value &&
+      templateStore.selectedElement &&
+      templateStore.currentTemplate
+    ) {
+      // Get fresh element reference by ID
+      const elementId = templateStore.selectedElement.id;
+      const currentElement = templateStore.currentTemplate.elements.find(
+        (el) => el.id === elementId
+      );
+
+      if (currentElement) {
+        const currentPos = currentElement.position;
+        const startPos = nudgeStartPosition.value;
+
+        // Only save to history if position actually changed
+        if (currentPos.x !== startPos.x || currentPos.y !== startPos.y) {
+          templateStore.saveCurrentStateToHistory();
+        }
+      }
+
+      isNudging.value = false;
+      nudgeStartPosition.value = null;
     }
   }
 }
@@ -338,10 +455,12 @@ function handleKeyboardShortcuts(event: KeyboardEvent) {
 // Lifecycle
 onMounted(() => {
   document.addEventListener('keydown', handleKeyboardShortcuts);
+  document.addEventListener('keyup', handleKeyUp);
 });
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeyboardShortcuts);
+  document.removeEventListener('keyup', handleKeyUp);
   document.removeEventListener('mousemove', onDragMove);
   document.removeEventListener('mouseup', stopDragElement);
   document.removeEventListener('mousemove', onResizeMove);
@@ -356,7 +475,7 @@ function getElementStyle(element: TemplateElement) {
     top: `${element.position.y}px`,
     width: `${element.size.width}px`,
     height: `${element.size.height}px`,
-    zIndex: element.zIndex || 0,
+    zIndex: Math.max(1, element.zIndex || 1),
   };
 
   switch (element.type) {
@@ -411,15 +530,15 @@ function getElementStyle(element: TemplateElement) {
       <!-- Canvas boundary indicator -->
       <div class="canvas-boundary"></div>
 
+      <!-- Grid overlay (when enabled) -->
+      <div v-if="snapToGrid" class="grid-overlay"></div>
+
       <!-- Render elements -->
       <div
         v-for="element in elements"
         :key="element.id"
         class="canvas-element"
-        :class="[
-          element.type,
-          { selected: element.id === selectedElementId }
-        ]"
+        :class="[element.type, { selected: element.id === selectedElementId }]"
         :style="getElementStyle(element)"
         @mousedown="startDragElement(element, $event)"
         @click="selectElement(element, $event)"
@@ -435,11 +554,15 @@ function getElementStyle(element: TemplateElement) {
         </div>
 
         <!-- Button Element -->
-        <div v-else-if="element.type === 'button'" class="element-content button-element" :style="{
-          backgroundColor: element.backgroundColor,
-          color: element.textColor,
-          borderRadius: `${element.borderRadius}px`
-        }">
+        <div
+          v-else-if="element.type === 'button'"
+          class="element-content button-element"
+          :style="{
+            backgroundColor: element.backgroundColor,
+            color: element.textColor,
+            borderRadius: `${element.borderRadius}px`,
+          }"
+        >
           {{ element.text }}
         </div>
 
@@ -452,27 +575,14 @@ function getElementStyle(element: TemplateElement) {
         />
 
         <!-- Divider Element -->
-        <div v-else-if="element.type === 'divider'" class="element-content divider-element">
-        </div>
+        <div v-else-if="element.type === 'divider'" class="element-content divider-element"></div>
 
         <!-- Resize Handles (only for selected element) -->
         <template v-if="element.id === selectedElementId">
-          <div 
-            class="resize-handle nw" 
-            @mousedown="startResize(element, 'nw', $event)"
-          ></div>
-          <div 
-            class="resize-handle ne" 
-            @mousedown="startResize(element, 'ne', $event)"
-          ></div>
-          <div 
-            class="resize-handle sw" 
-            @mousedown="startResize(element, 'sw', $event)"
-          ></div>
-          <div 
-            class="resize-handle se" 
-            @mousedown="startResize(element, 'se', $event)"
-          ></div>
+          <div class="resize-handle nw" @mousedown="startResize(element, 'nw', $event)"></div>
+          <div class="resize-handle ne" @mousedown="startResize(element, 'ne', $event)"></div>
+          <div class="resize-handle sw" @mousedown="startResize(element, 'sw', $event)"></div>
+          <div class="resize-handle se" @mousedown="startResize(element, 'se', $event)"></div>
         </template>
       </div>
 
@@ -484,27 +594,62 @@ function getElementStyle(element: TemplateElement) {
 
     <!-- Undo/Redo Controls -->
     <div class="canvas-controls">
-      <button 
+      <button
+        class="control-btn"
+        :class="{ active: snapToGrid }"
+        title="Toggle Grid Snap (10px)"
+        @click="snapToGrid = !snapToGrid"
+      >
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+        </svg>
+        Grid {{ snapToGrid ? 'ON' : 'OFF' }}
+      </button>
+      <button
         class="control-btn"
         :disabled="!templateStore.canUndo"
-        @click="templateStore.undo()"
         title="Undo (Ctrl+Z)"
+        @click="templateStore.undo()"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 7v6h6"/>
-          <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M3 7v6h6" />
+          <path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13" />
         </svg>
         Undo
       </button>
-      <button 
+      <button
         class="control-btn"
         :disabled="!templateStore.canRedo"
-        @click="templateStore.redo()"
         title="Redo (Ctrl+Y)"
+        @click="templateStore.redo()"
       >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 7v6h-6"/>
-          <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M21 7v6h-6" />
+          <path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7" />
         </svg>
         Redo
       </button>
@@ -517,6 +662,3 @@ function getElementStyle(element: TemplateElement) {
     </div>
   </div>
 </template>
-
-
-
